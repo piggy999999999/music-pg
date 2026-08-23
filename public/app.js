@@ -12,7 +12,6 @@ class MusicPlayer {
         this.loadAlbums();
     }
     
-    // Инициализация обработчиков событий
     initEventListeners() {
         // Навигация
         document.querySelectorAll('.nav-link').forEach(link => {
@@ -47,7 +46,6 @@ class MusicPlayer {
         this.setVolume(70);
     }
     
-    // Инициализация загрузки файлов
     initUploadListeners() {
         const uploadArea = document.getElementById('upload-area');
         const fileInput = document.getElementById('file-input');
@@ -58,7 +56,6 @@ class MusicPlayer {
             return;
         }
         
-        // Открытие диалога выбора файлов
         selectFilesBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             fileInput.click();
@@ -68,12 +65,10 @@ class MusicPlayer {
             fileInput.click();
         });
         
-        // Выбор файлов через диалог
         fileInput.addEventListener('change', (e) => {
             this.handleFiles(e.target.files);
         });
         
-        // Drag and drop
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
@@ -87,13 +82,10 @@ class MusicPlayer {
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            
-            const files = e.dataTransfer.files;
-            this.handleFiles(files);
+            this.handleFiles(e.dataTransfer.files);
         });
     }
     
-    // Обработка выбранных файлов
     handleFiles(files) {
         const allowedExtensions = ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus'];
         
@@ -111,7 +103,6 @@ class MusicPlayer {
         this.uploadFiles(audioFiles);
     }
     
-    // Загрузка файлов на сервер
     async uploadFiles(files) {
         console.log('Начинаю загрузку файлов:', files.length);
         
@@ -122,7 +113,6 @@ class MusicPlayer {
             formData.append('files', file);
         });
         
-        // Показываем прогресс
         const progressContainer = document.getElementById('upload-progress');
         const progressFill = document.getElementById('progress-fill');
         const uploadStatus = document.getElementById('upload-status');
@@ -136,7 +126,6 @@ class MusicPlayer {
         try {
             const xhr = new XMLHttpRequest();
             
-            // Отслеживаем прогресс загрузки
             xhr.upload.addEventListener('progress', (e) => {
                 if (e.lengthComputable) {
                     const percentComplete = (e.loaded / e.total) * 100;
@@ -145,7 +134,6 @@ class MusicPlayer {
                 }
             });
             
-            // Обработка ответа
             xhr.addEventListener('load', () => {
                 if (xhr.status === 200) {
                     const response = JSON.parse(xhr.responseText);
@@ -153,17 +141,13 @@ class MusicPlayer {
                     progressFill.style.width = '100%';
                     uploadStatus.textContent = response.message;
                     
-                    // Показываем результаты
                     this.displayUploadResults(response.tracks);
                     
-                    // Обновляем список треков
                     this.loadAllTracks();
                     this.loadAlbums();
                     
-                    // Очищаем input
                     document.getElementById('file-input').value = '';
                     
-                    // Скрываем прогресс через 3 секунды
                     setTimeout(() => {
                         progressContainer.style.display = 'none';
                     }, 3000);
@@ -174,13 +158,11 @@ class MusicPlayer {
                 }
             });
             
-            // Обработка ошибок
             xhr.addEventListener('error', () => {
                 uploadStatus.textContent = 'Ошибка сети при загрузке';
                 progressFill.style.width = '0%';
             });
             
-            // Отправляем файлы
             xhr.open('POST', '/api/upload', true);
             xhr.send(formData);
             
@@ -191,7 +173,6 @@ class MusicPlayer {
         }
     }
     
-    // Отображение результатов загрузки
     displayUploadResults(tracks) {
         const resultsContainer = document.getElementById('upload-results');
         resultsContainer.innerHTML = '<h3>Загруженные треки:</h3>';
@@ -215,30 +196,23 @@ class MusicPlayer {
         });
     }
     
-    // Навигация по страницам
     navigate(page) {
         console.log('Навигация на страницу:', page);
         
-        // Скрываем все секции
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        
-        // Убираем активный класс у всех ссылок
         document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
         
-        // Показываем нужную секцию
         const targetSection = document.getElementById(page);
         if (targetSection) {
             targetSection.classList.add('active');
         }
         
-        // Отмечаем активную ссылку
         const activeLink = document.querySelector(`.nav-link[data-page="${page}"]`);
         if (activeLink) {
             activeLink.classList.add('active');
         }
     }
     
-    // Загрузка всех треков
     async loadAllTracks() {
         try {
             const response = await fetch('/api/tracks');
@@ -250,7 +224,6 @@ class MusicPlayer {
         }
     }
     
-    // Перемешивание треков
     shuffleTracks() {
         if (this.isRandom && this.tracks.length > 0) {
             for (let i = this.tracks.length - 1; i > 0; i--) {
@@ -260,7 +233,6 @@ class MusicPlayer {
         }
     }
     
-        // Воспроизведение трека
     playTrack(index) {
         if (index >= 0 && index < this.tracks.length) {
             this.currentTrackIndex = index;
@@ -268,132 +240,24 @@ class MusicPlayer {
             
             console.log('Воспроизвожу трек:', track);
             
-            // Обновляем информацию о треке
             document.getElementById('track-title').textContent = track.title;
             document.getElementById('track-artist').textContent = track.artist_name;
             
-            // Устанавливаем обложку альбома
-            if (track.album_cover) {
-                console.log('Обложка:', track.album_cover);
-                document.getElementById('track-image').src = track.album_cover;
-            }
-            
-            // Устанавливаем аудиофайл
-            if (track.file_path) {
-                console.log('Путь к файлу:', track.file_path);
-                
-                // Создаем новый Audio элемент для избежания проблем
-                this.audio = new Audio();
-                
-                // Добавляем обработчики
-                this.audio.addEventListener('timeupdate', () => this.updateProgress());
-                this.audio.addEventListener('ended', () => this.nextTrack());
-                this.audio.addEventListener('loadedmetadata', () => this.updateProgress());
-                
-                // Пробуем разные форматы
-                const fileExt = track.file_path.split('.').pop().toLowerCase();
-                console.log('Расширение файла:', fileExt);
-                
-                // Для M4A файлов пробуем разные MIME типы
-                if (fileExt === 'm4a') {
-                    // Создаем source элементы для разных форматов
-                    const source = document.createElement('source');
-                    source.src = track.file_path;
-                    source.type = 'audio/mp4';
-                    this.audio.appendChild(source);
-                    
-                    // Запасной вариант
-                    const source2 = document.createElement('source');
-                    source2.src = track.file_path;
-                    source2.type = 'audio/aac';
-                    this.audio.appendChild(source2);
-                } else {
-                    this.audio.src = track.file_path;
-                }
-                
-                this.audio.load();
-                
-                this.audio.play()
-                    .then(() => {
-                        console.log('Воспроизведение началось');
-                        this.isPlaying = true;
-                        document.getElementById('play-btn').textContent = '⏸';
-                    })
-                    .catch(error => {
-                        console.error('Ошибка воспроизведения:', error);
-                        
-                        // Пробуем альтернативный способ
-                        this.tryAlternativePlayback(track);
-                    });
-            } else {
-                console.log('Нет пути к файлу, использую заглушку');
-                this.audio.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
-                this.audio.play();
-                this.isPlaying = true;
-                document.getElementById('play-btn').textContent = '⏸';
-            }
-        }
-    }
-    
-    // Альтернативный способ воспроизведения
-    tryAlternativePlayback(track) {
-        console.log('Пробую альтернативное воспроизведение');
-        
-        // Пробуем через fetch и blob
-        fetch(track.file_path)
-            .then(response => response.blob())
-            .then(blob => {
-                const url = URL.createObjectURL(blob);
-                this.audio.src = url;
-                return this.audio.play();
-            })
-            .then(() => {
-                console.log('Альтернативное воспроизведение сработало');
-                this.isPlaying = true;
-                document.getElementById('play-btn').textContent = '⏸';
-            })
-            .catch(error => {
-                console.error('Все способы не сработали:', error);
-                alert('Не удалось воспроизвести файл. Формат может не поддерживаться браузером.');
-            });
-    }
-            
-            // Обновляем информацию о треке
-            document.getElementById('track-title').textContent = track.title;
-            document.getElementById('track-artist').textContent = track.artist_name;
-            
-            // Устанавливаем обложку альбома
             if (track.album_cover) {
                 document.getElementById('track-image').src = track.album_cover;
             }
             
-            // Устанавливаем аудиофайл
             if (track.file_path) {
-                console.log('Путь к файлу:', track.file_path);
                 this.audio.src = track.file_path;
-                this.audio.load();
-                
-                this.audio.play()
-                    .then(() => {
-                        console.log('Воспроизведение началось');
-                        this.isPlaying = true;
-                        document.getElementById('play-btn').textContent = '⏸';
-                    })
-                    .catch(error => {
-                        console.error('Ошибка воспроизведения:', error);
-                        alert('Не удалось воспроизвести файл. Возможно, он был удален с сервера.');
-                    });
-            } else {
-                console.log('Нет пути к файлу, использую заглушку');
-                this.audio.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
-                this.audio.play();
+                this.audio.play().catch(error => {
+                    console.error('Ошибка воспроизведения:', error);
+                });
                 this.isPlaying = true;
                 document.getElementById('play-btn').textContent = '⏸';
             }
         }
     }
     
-    // Переключение воспроизведения
     togglePlay() {
         if (this.tracks.length === 0) return;
         
@@ -401,17 +265,14 @@ class MusicPlayer {
             this.audio.pause();
             document.getElementById('play-btn').textContent = '▶️';
         } else {
-            if (!this.audio.src) {
-                this.playTrack(this.currentTrackIndex);
-            } else {
-                this.audio.play();
-                document.getElementById('play-btn').textContent = '⏸';
-            }
+            this.audio.play().catch(error => {
+                console.error('Ошибка воспроизведения:', error);
+            });
+            document.getElementById('play-btn').textContent = '⏸';
         }
         this.isPlaying = !this.isPlaying;
     }
     
-    // Следующий трек
     nextTrack() {
         if (this.tracks.length === 0) return;
         
@@ -422,13 +283,11 @@ class MusicPlayer {
         }
     }
     
-    // Предыдущий трек
     prevTrack() {
         if (this.tracks.length === 0) return;
         this.playTrack((this.currentTrackIndex - 1 + this.tracks.length) % this.tracks.length);
     }
     
-    // Обновление прогресса
     updateProgress() {
         if (this.audio.duration) {
             const progress = (this.audio.currentTime / this.audio.duration) * 100;
@@ -439,7 +298,6 @@ class MusicPlayer {
         }
     }
     
-    // Перемотка
     seek(value) {
         if (this.audio.duration) {
             const time = (value / 100) * this.audio.duration;
@@ -447,12 +305,10 @@ class MusicPlayer {
         }
     }
     
-    // Установка громкости
     setVolume(value) {
         this.audio.volume = value / 100;
     }
     
-    // Форматирование времени
     formatTime(seconds) {
         if (isNaN(seconds)) return '0:00';
         const minutes = Math.floor(seconds / 60);
@@ -460,7 +316,6 @@ class MusicPlayer {
         return `${minutes}:${secs.toString().padStart(2, '0')}`;
     }
     
-    // Поиск треков
     async searchTracks(query) {
         if (query.length < 2) {
             document.getElementById('search-results').innerHTML = '';
@@ -476,7 +331,6 @@ class MusicPlayer {
         }
     }
     
-    // Отображение результатов поиска
     displaySearchResults(tracks) {
         const resultsContainer = document.getElementById('search-results');
         resultsContainer.innerHTML = '';
@@ -512,7 +366,6 @@ class MusicPlayer {
         });
     }
     
-    // Загрузка списка альбомов
     async loadAlbums() {
         try {
             const response = await fetch('/api/albums');
@@ -523,7 +376,6 @@ class MusicPlayer {
         }
     }
     
-    // Отображение альбомов
     displayAlbums(albums) {
         const albumsGrid = document.getElementById('albums-grid');
         albumsGrid.innerHTML = '';
@@ -555,7 +407,6 @@ class MusicPlayer {
         });
     }
     
-    // Просмотр страницы исполнителя
     async viewArtist(artistId) {
         try {
             const response = await fetch(`/api/artists/${artistId}`);
@@ -567,7 +418,6 @@ class MusicPlayer {
         }
     }
     
-    // Отображение страницы исполнителя
     displayArtistPage(data) {
         const artistInfo = document.getElementById('artist-info');
         artistInfo.innerHTML = `
@@ -637,7 +487,6 @@ class MusicPlayer {
         artistAlbums.appendChild(albumsGrid);
     }
     
-    // Просмотр страницы альбома
     async viewAlbum(albumId) {
         try {
             const response = await fetch(`/api/albums/${albumId}`);
@@ -649,7 +498,6 @@ class MusicPlayer {
         }
     }
     
-    // Отображение страницы альбома
     displayAlbumPage(data) {
         const albumInfo = document.getElementById('album-info');
         albumInfo.innerHTML = `
@@ -701,7 +549,6 @@ class MusicPlayer {
         });
     }
     
-    // Воспроизведение альбома
     async playAlbum(albumId) {
         try {
             const response = await fetch(`/api/albums/${albumId}`);
