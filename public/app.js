@@ -260,13 +260,103 @@ class MusicPlayer {
         }
     }
     
-    // Воспроизведение трека
+        // Воспроизведение трека
     playTrack(index) {
         if (index >= 0 && index < this.tracks.length) {
             this.currentTrackIndex = index;
             const track = this.tracks[index];
             
             console.log('Воспроизвожу трек:', track);
+            
+            // Обновляем информацию о треке
+            document.getElementById('track-title').textContent = track.title;
+            document.getElementById('track-artist').textContent = track.artist_name;
+            
+            // Устанавливаем обложку альбома
+            if (track.album_cover) {
+                console.log('Обложка:', track.album_cover);
+                document.getElementById('track-image').src = track.album_cover;
+            }
+            
+            // Устанавливаем аудиофайл
+            if (track.file_path) {
+                console.log('Путь к файлу:', track.file_path);
+                
+                // Создаем новый Audio элемент для избежания проблем
+                this.audio = new Audio();
+                
+                // Добавляем обработчики
+                this.audio.addEventListener('timeupdate', () => this.updateProgress());
+                this.audio.addEventListener('ended', () => this.nextTrack());
+                this.audio.addEventListener('loadedmetadata', () => this.updateProgress());
+                
+                // Пробуем разные форматы
+                const fileExt = track.file_path.split('.').pop().toLowerCase();
+                console.log('Расширение файла:', fileExt);
+                
+                // Для M4A файлов пробуем разные MIME типы
+                if (fileExt === 'm4a') {
+                    // Создаем source элементы для разных форматов
+                    const source = document.createElement('source');
+                    source.src = track.file_path;
+                    source.type = 'audio/mp4';
+                    this.audio.appendChild(source);
+                    
+                    // Запасной вариант
+                    const source2 = document.createElement('source');
+                    source2.src = track.file_path;
+                    source2.type = 'audio/aac';
+                    this.audio.appendChild(source2);
+                } else {
+                    this.audio.src = track.file_path;
+                }
+                
+                this.audio.load();
+                
+                this.audio.play()
+                    .then(() => {
+                        console.log('Воспроизведение началось');
+                        this.isPlaying = true;
+                        document.getElementById('play-btn').textContent = '⏸';
+                    })
+                    .catch(error => {
+                        console.error('Ошибка воспроизведения:', error);
+                        
+                        // Пробуем альтернативный способ
+                        this.tryAlternativePlayback(track);
+                    });
+            } else {
+                console.log('Нет пути к файлу, использую заглушку');
+                this.audio.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+                this.audio.play();
+                this.isPlaying = true;
+                document.getElementById('play-btn').textContent = '⏸';
+            }
+        }
+    }
+    
+    // Альтернативный способ воспроизведения
+    tryAlternativePlayback(track) {
+        console.log('Пробую альтернативное воспроизведение');
+        
+        // Пробуем через fetch и blob
+        fetch(track.file_path)
+            .then(response => response.blob())
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                this.audio.src = url;
+                return this.audio.play();
+            })
+            .then(() => {
+                console.log('Альтернативное воспроизведение сработало');
+                this.isPlaying = true;
+                document.getElementById('play-btn').textContent = '⏸';
+            })
+            .catch(error => {
+                console.error('Все способы не сработали:', error);
+                alert('Не удалось воспроизвести файл. Формат может не поддерживаться браузером.');
+            });
+    }
             
             // Обновляем информацию о треке
             document.getElementById('track-title').textContent = track.title;
