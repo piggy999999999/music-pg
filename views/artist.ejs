@@ -1,0 +1,57 @@
+<div class="section active">
+    <div class="artist-header">
+        <img src="<%= artist.photo || 'https://via.placeholder.com/200x200/333/fff?text=Artist' %>" alt="<%= artist.name %>">
+        <div>
+            <h1><%= artist.name %></h1>
+            <button class="artist-play-btn" id="play-artist-btn">▶️ Играть все</button>
+        </div>
+    </div>
+    
+    <h2>Треки (<%= tracks.length %>)</h2>
+    
+    <% if (tracks.length === 0) { %>
+        <p>У этого исполнителя пока нет треков.</p>
+    <% } else { %>
+        <div class="tracks-list">
+            <% tracks.forEach((track, index) => { %>
+                <div class="track-item" data-track-index="<%= index %>" data-track-id="<%= track.id %>">
+                    <div class="track-info">
+                        <div class="track-title"><%= track.title %></div>
+                        <% if (track.album_id) { %>
+                            <div class="track-artist">
+                                <a href="/album/<%= track.album_id %>" class="album-link">Альбом</a>
+                            </div>
+                        <% } %>
+                    </div>
+                    <button class="play-button">▶</button>
+                </div>
+            <% }) %>
+        </div>
+    <% } %>
+    
+    <% if (albums.length > 0) { %>
+        <h2>Альбомы (<%= albums.length %>)</h2>
+        
+        <div id="albums-grid">
+            <% albums.forEach(album => { %>
+                <div class="album-card">
+                    <a href="/album/<%= album.id %>">
+                        <img src="<%= album.cover || 'https://via.placeholder.com/200x200/333/fff?text=Album' %>" alt="<%= album.title %>">
+                    </a>
+                    <div class="album-info">
+                        <div class="album-title">
+                            <a href="/album/<%= album.id %>"><%= album.title %></a>
+                        </div>
+                        <div class="album-year"><%= album.year || 'Год неизвестен' %></div>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    <% } %>
+</div>
+
+<script>
+    // Передаем треки исполнителя в JavaScript
+    const artistTracks = <%- JSON.stringify(tracks) %>;
+    const currentArtist = <%- JSON.stringify(artist) %>;
+</script>
