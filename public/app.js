@@ -7,54 +7,133 @@ class MusicPlayer {
         this.isPlaying = false;
         this.isRandom = true;
         
-        this.initEventListeners();
-        this.loadAllTracks();
-        this.loadAlbums();
+        this.init();
     }
     
-    initEventListeners() {
-        // Навигация
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const page = link.getAttribute('data-page');
-                this.navigate(page);
-            });
-        });
+    init() {
+        // Получаем треки из глобальных переменных (если они есть)
+        if (typeof allTracks !== 'undefined') {
+            this.tracks = allTracks;
+        } else if (typeof albumTracks !== 'undefined') {
+            this.tracks = albumTracks;
+        } else if (typeof artistTracks !== 'undefined') {
+            this.tracks = artistTracks;
+        }
         
-        // Управление плеером
-        document.getElementById('play-btn').addEventListener('click', () => this.togglePlay());
-        document.getElementById('prev-btn').addEventListener('click', () => this.prevTrack());
-        document.getElementById('next-btn').addEventListener('click', () => this.nextTrack());
+        this.initPlayerControls();
+        this.initTrackClicks();
+        this.initAlbumPlayButtons();
+        this.initArtistPlayButton();
+        this.initSearch();
+        this.initUpload();
         
-        // Прогресс и громкость
-        document.getElementById('progress-bar').addEventListener('input', (e) => this.seek(e.target.value));
-        document.getElementById('volume-bar').addEventListener('input', (e) => this.setVolume(e.target.value));
+        // Установка громкости
+        this.setVolume(70);
         
-        // События аудио
+        console.log('Плеер инициализирован. Треков:', this.tracks.length);
+    }
+    
+    initPlayerControls() {
+        const playBtn = document.getElementById('play-btn');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const volumeBar = document.getElementById('volume-bar');
+        
+        if (playBtn) playBtn.addEventListener('click', () => this.togglePlay());
+        if (prevBtn) prevBtn.addEventListener('click', () => this.prevTrack());
+        if (nextBtn) nextBtn.addEventListener('click', () => this.nextTrack());
+        if (progressBar) progressBar.addEventListener('input', (e) => this.seek(e.target.value));
+        if (volumeBar) volumeBar.addEventListener('input', (e) => this.setVolume(e.target.value));
+        
         this.audio.addEventListener('timeupdate', () => this.updateProgress());
         this.audio.addEventListener('ended', () => this.nextTrack());
         this.audio.addEventListener('loadedmetadata', () => this.updateProgress());
-        
-        // Поиск
-        document.getElementById('search-input').addEventListener('input', (e) => this.searchTracks(e.target.value));
-        
-        // Загрузка файлов
-        this.initUploadListeners();
-        
-        // Установка начальной громкости
-        this.setVolume(70);
     }
     
-    initUploadListeners() {
+    initTrackClicks() {
+        document.querySelectorAll('.track-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                // Не срабатываем при клике на ссылку или кнопку
+                if (e.target.closest('a') || e.target.closest('button')) return;
+                
+                const index = parseInt(item.getAttribute('data-track-index'));
+                if (!isNaN(index)) {
+                    this.playTrack(index);
+                }
+            });
+            
+            const playBtn = item.querySelector('.play-button');
+            if (playBtn) {
+                playBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const index = parseInt(item.getAttribute('data-track-index'));
+                    if (!isNaN(index)) {
+                        this.playTrack(index);
+                    }
+                });
+            }
+        });
+    }
+    
+    initAlbumPlayButtons() {
+        document.querySelectorAll('.play-overlay').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const albumId = btn.getAttribute('data-album-id');
+                if (albumId) {
+                    this.loadAlbumTracks(albumId);
+                }
+            });
+        });
+        
+        const playAlbumBtn = document.getElementById('play-album-btn');
+        if (playAlbumBtn && typeof albumTracks !== 'undefined') {
+            playAlbumBtn.addEventListener('click', () => {
+                this.tracks = albumTracks;
+                this.isRandom = false;
+                this.playTrack(0);
+            });
+        }
+    }
+    
+    initArtistPlayButton() {
+        const playArtistBtn = document.getElementById('play-artist-btn');
+        if (playArtistBtn && typeof artistTracks !== 'undefined') {
+            playArtistBtn.addEventListener('click', () => {
+                this.tracks = artistTracks;
+                this.isRandom = true;
+                this.shuffleTracks();
+                this.playTrack(0);
+            });
+        }
+    }
+    
+    async loadAlbumTracks(albumId) {
+        try {
+            const response = await fetch(`/api/albums/${albumId}`);
+            const data = await response.json();
+            this.tracks = data.tracks;
+            this.isRandom = false;
+            this.playTrack(0);
+        } catch (error) {
+            console.error('Ошибка загрузки треков альбома:', error);
+        }
+    }
+    
+    initSearch() {
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => this.searchTracks(e.target.value));
+        }
+    }
+    
+    initUpload() {
         const uploadArea = document.getElementById('upload-area');
         const fileInput = document.getElementById('file-input');
         const selectFilesBtn = document.getElementById('select-files-btn');
         
-        if (!uploadArea || !fileInput || !selectFilesBtn) {
-            console.error('Элементы загрузки не найдены');
-            return;
-        }
+        if (!uploadArea || !fileInput || !selectFilesBtn) return;
         
         selectFilesBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -99,68 +178,69 @@ class MusicPlayer {
             return;
         }
         
-        console.log('Найдено аудиофайлов:', audioFiles.length);
         this.uploadFiles(audioFiles);
     }
     
     async uploadFiles(files) {
-        console.log('Начинаю загрузку файлов:', files.length);
-        
         const formData = new FormData();
-        
-        files.forEach(file => {
-            console.log('Добавляю файл:', file.name, file.type, file.size);
-            formData.append('files', file);
-        });
+        files.forEach(file => formData.append('files', file));
         
         const progressContainer = document.getElementById('upload-progress');
         const progressFill = document.getElementById('progress-fill');
         const uploadStatus = document.getElementById('upload-status');
         const resultsContainer = document.getElementById('upload-results');
         
-        progressContainer.style.display = 'block';
-        progressFill.style.width = '0%';
-        uploadStatus.textContent = `Подготовка к загрузке ${files.length} файлов...`;
-        resultsContainer.innerHTML = '';
+        if (progressContainer) progressContainer.style.display = 'block';
+        if (progressFill) progressFill.style.width = '0%';
+        if (uploadStatus) uploadStatus.textContent = `Загрузка ${files.length} файлов...`;
+        if (resultsContainer) resultsContainer.innerHTML = '';
         
         try {
             const xhr = new XMLHttpRequest();
             
             xhr.upload.addEventListener('progress', (e) => {
-                if (e.lengthComputable) {
-                    const percentComplete = (e.loaded / e.total) * 100;
-                    progressFill.style.width = percentComplete + '%';
-                    uploadStatus.textContent = `Загрузка: ${Math.round(percentComplete)}%`;
+                if (e.lengthComputable && progressFill) {
+                    const percent = (e.loaded / e.total) * 100;
+                    progressFill.style.width = percent + '%';
+                    if (uploadStatus) uploadStatus.textContent = `Загрузка: ${Math.round(percent)}%`;
                 }
             });
             
             xhr.addEventListener('load', () => {
                 if (xhr.status === 200) {
                     const response = JSON.parse(xhr.responseText);
+                    if (progressFill) progressFill.style.width = '100%';
+                    if (uploadStatus) uploadStatus.textContent = response.message;
                     
-                    progressFill.style.width = '100%';
-                    uploadStatus.textContent = response.message;
+                    if (resultsContainer) {
+                        resultsContainer.innerHTML = '<h3>Загруженные треки:</h3>';
+                        response.tracks.forEach(track => {
+                            const div = document.createElement('div');
+                            div.className = 'upload-result-item';
+                            div.innerHTML = `
+                                <div class="track-info">
+                                    <div class="track-title">${track.title}</div>
+                                    <div class="track-artist">${track.artist_name} • ${track.album_title}</div>
+                                </div>
+                                <span class="success-icon">✓</span>
+                            `;
+                            resultsContainer.appendChild(div);
+                        });
+                    }
                     
-                    this.displayUploadResults(response.tracks);
-                    
-                    this.loadAllTracks();
-                    this.loadAlbums();
-                    
-                    document.getElementById('file-input').value = '';
+                    if (fileInput) fileInput.value = '';
                     
                     setTimeout(() => {
-                        progressContainer.style.display = 'none';
+                        if (progressContainer) progressContainer.style.display = 'none';
                     }, 3000);
                     
-                } else {
-                    uploadStatus.textContent = 'Ошибка при загрузке файлов';
-                    progressFill.style.width = '0%';
+                    // Предлагаем перезагрузить страницу
+                    setTimeout(() => {
+                        if (confirm('Треки загружены! Перезагрузить страницу для обновления списка?')) {
+                            window.location.reload();
+                        }
+                    }, 3500);
                 }
-            });
-            
-            xhr.addEventListener('error', () => {
-                uploadStatus.textContent = 'Ошибка сети при загрузке';
-                progressFill.style.width = '0%';
             });
             
             xhr.open('POST', '/api/upload', true);
@@ -168,59 +248,7 @@ class MusicPlayer {
             
         } catch (error) {
             console.error('Ошибка загрузки:', error);
-            uploadStatus.textContent = 'Ошибка при загрузке файлов';
-            progressFill.style.width = '0%';
-        }
-    }
-    
-    displayUploadResults(tracks) {
-        const resultsContainer = document.getElementById('upload-results');
-        resultsContainer.innerHTML = '<h3>Загруженные треки:</h3>';
-        
-        if (!tracks || tracks.length === 0) {
-            resultsContainer.innerHTML += '<p>Нет загруженных треков</p>';
-            return;
-        }
-        
-        tracks.forEach(track => {
-            const trackElement = document.createElement('div');
-            trackElement.className = 'upload-result-item';
-            trackElement.innerHTML = `
-                <div class="track-info">
-                    <div class="track-title">${track.title}</div>
-                    <div class="track-artist">${track.artist_name} • ${track.album_title}</div>
-                </div>
-                <span class="success-icon">✓</span>
-            `;
-            resultsContainer.appendChild(trackElement);
-        });
-    }
-    
-    navigate(page) {
-        console.log('Навигация на страницу:', page);
-        
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-        
-        const targetSection = document.getElementById(page);
-        if (targetSection) {
-            targetSection.classList.add('active');
-        }
-        
-        const activeLink = document.querySelector(`.nav-link[data-page="${page}"]`);
-        if (activeLink) {
-            activeLink.classList.add('active');
-        }
-    }
-    
-    async loadAllTracks() {
-        try {
-            const response = await fetch('/api/tracks');
-            this.tracks = await response.json();
-            console.log('Загружено треков:', this.tracks.length);
-            this.shuffleTracks();
-        } catch (error) {
-            console.error('Ошибка загрузки треков:', error);
+            if (uploadStatus) uploadStatus.textContent = 'Ошибка при загрузке файлов';
         }
     }
     
@@ -238,14 +266,15 @@ class MusicPlayer {
             this.currentTrackIndex = index;
             const track = this.tracks[index];
             
-            console.log('Воспроизвожу трек:', track);
+            console.log('Воспроизвожу трек:', track.title, track.file_path);
             
-            document.getElementById('track-title').textContent = track.title;
-            document.getElementById('track-artist').textContent = track.artist_name;
+            const trackTitle = document.getElementById('track-title');
+            const trackArtist = document.getElementById('track-artist');
+            const trackImage = document.getElementById('track-image');
             
-            if (track.album_cover) {
-                document.getElementById('track-image').src = track.album_cover;
-            }
+            if (trackTitle) trackTitle.textContent = track.title;
+            if (trackArtist) trackArtist.textContent = track.artist_name || 'Неизвестный исполнитель';
+            if (trackImage && track.album_cover) trackImage.src = track.album_cover;
             
             if (track.file_path) {
                 this.audio.src = track.file_path;
@@ -253,7 +282,8 @@ class MusicPlayer {
                     console.error('Ошибка воспроизведения:', error);
                 });
                 this.isPlaying = true;
-                document.getElementById('play-btn').textContent = '⏸';
+                const playBtn = document.getElementById('play-btn');
+                if (playBtn) playBtn.textContent = '⏸';
             }
         }
     }
@@ -263,12 +293,14 @@ class MusicPlayer {
         
         if (this.isPlaying) {
             this.audio.pause();
-            document.getElementById('play-btn').textContent = '▶️';
+            const playBtn = document.getElementById('play-btn');
+            if (playBtn) playBtn.textContent = '▶️';
         } else {
             this.audio.play().catch(error => {
                 console.error('Ошибка воспроизведения:', error);
             });
-            document.getElementById('play-btn').textContent = '⏸';
+            const playBtn = document.getElementById('play-btn');
+            if (playBtn) playBtn.textContent = '⏸';
         }
         this.isPlaying = !this.isPlaying;
     }
@@ -290,18 +322,19 @@ class MusicPlayer {
     
     updateProgress() {
         if (this.audio.duration) {
-            const progress = (this.audio.currentTime / this.audio.duration) * 100;
-            document.getElementById('progress-bar').value = progress;
+            const progressBar = document.getElementById('progress-bar');
+            const currentTime = document.getElementById('current-time');
+            const totalTime = document.getElementById('total-time');
             
-            document.getElementById('current-time').textContent = this.formatTime(this.audio.currentTime);
-            document.getElementById('total-time').textContent = this.formatTime(this.audio.duration);
+            if (progressBar) progressBar.value = (this.audio.currentTime / this.audio.duration) * 100;
+            if (currentTime) currentTime.textContent = this.formatTime(this.audio.currentTime);
+            if (totalTime) totalTime.textContent = this.formatTime(this.audio.duration);
         }
     }
     
     seek(value) {
         if (this.audio.duration) {
-            const time = (value / 100) * this.audio.duration;
-            this.audio.currentTime = time;
+            this.audio.currentTime = (value / 100) * this.audio.duration;
         }
     }
     
@@ -317,250 +350,50 @@ class MusicPlayer {
     }
     
     async searchTracks(query) {
+        const resultsContainer = document.getElementById('search-results');
+        if (!resultsContainer) return;
+        
         if (query.length < 2) {
-            document.getElementById('search-results').innerHTML = '';
+            resultsContainer.innerHTML = '';
             return;
         }
         
         try {
             const response = await fetch(`/api/tracks/search?q=${encodeURIComponent(query)}`);
             const tracks = await response.json();
-            this.displaySearchResults(tracks);
+            
+            resultsContainer.innerHTML = '';
+            
+            if (tracks.length === 0) {
+                resultsContainer.innerHTML = '<p>Ничего не найдено</p>';
+                return;
+            }
+            
+            tracks.forEach((track, index) => {
+                const div = document.createElement('div');
+                div.className = 'track-item';
+                div.innerHTML = `
+                    <div>
+                        <a href="/artist/${track.artist_id}" class="artist-link">${track.artist_name}</a>
+                        - ${track.title}
+                    </div>
+                    <button class="play-button" data-index="${index}">▶</button>
+                `;
+                
+                div.querySelector('.play-button').addEventListener('click', () => {
+                    this.tracks = tracks;
+                    this.playTrack(index);
+                });
+                
+                resultsContainer.appendChild(div);
+            });
         } catch (error) {
             console.error('Ошибка поиска:', error);
         }
     }
-    
-    displaySearchResults(tracks) {
-        const resultsContainer = document.getElementById('search-results');
-        resultsContainer.innerHTML = '';
-        
-        if (tracks.length === 0) {
-            resultsContainer.innerHTML = '<p>Ничего не найдено</p>';
-            return;
-        }
-        
-        tracks.forEach(track => {
-            const trackElement = document.createElement('div');
-            trackElement.className = 'track-item';
-            trackElement.innerHTML = `
-                <div>
-                    <span class="artist-link" data-artist-id="${track.artist_id}">${track.artist_name}</span>
-                    - ${track.title}
-                </div>
-                <button class="play-button" data-track-id="${track.id}">▶</button>
-            `;
-            
-            trackElement.querySelector('.artist-link').addEventListener('click', () => {
-                this.viewArtist(track.artist_id);
-            });
-            
-            trackElement.querySelector('.play-button').addEventListener('click', () => {
-                const index = this.tracks.findIndex(t => t.id === track.id);
-                if (index !== -1) {
-                    this.playTrack(index);
-                }
-            });
-            
-            resultsContainer.appendChild(trackElement);
-        });
-    }
-    
-    async loadAlbums() {
-        try {
-            const response = await fetch('/api/albums');
-            const albums = await response.json();
-            this.displayAlbums(albums);
-        } catch (error) {
-            console.error('Ошибка загрузки альбомов:', error);
-        }
-    }
-    
-    displayAlbums(albums) {
-        const albumsGrid = document.getElementById('albums-grid');
-        albumsGrid.innerHTML = '';
-        
-        albums.forEach(album => {
-            const albumCard = document.createElement('div');
-            albumCard.className = 'album-card';
-            albumCard.innerHTML = `
-                <img src="${album.cover || 'https://via.placeholder.com/200x200/333/fff?text=Album'}" alt="${album.title}">
-                <div class="album-info">
-                    <div class="album-title">${album.title}</div>
-                    <div class="album-year">${album.year} • ${album.track_count} треков</div>
-                    <div class="album-year">${album.artist_name}</div>
-                </div>
-                <div class="play-overlay">▶</div>
-            `;
-            
-            albumCard.addEventListener('click', (e) => {
-                if (!e.target.classList.contains('play-overlay')) {
-                    this.viewAlbum(album.id);
-                }
-            });
-            
-            albumCard.querySelector('.play-overlay').addEventListener('click', () => {
-                this.playAlbum(album.id);
-            });
-            
-            albumsGrid.appendChild(albumCard);
-        });
-    }
-    
-    async viewArtist(artistId) {
-        try {
-            const response = await fetch(`/api/artists/${artistId}`);
-            const data = await response.json();
-            this.displayArtistPage(data);
-            this.navigate('artist-page');
-        } catch (error) {
-            console.error('Ошибка загрузки исполнителя:', error);
-        }
-    }
-    
-    displayArtistPage(data) {
-        const artistInfo = document.getElementById('artist-info');
-        artistInfo.innerHTML = `
-            <div class="artist-header">
-                <img src="${data.artist.photo || 'https://via.placeholder.com/200x200/333/fff?text=Artist'}" alt="${data.artist.name}">
-                <div>
-                    <h1>${data.artist.name}</h1>
-                    <button class="artist-play-btn">▶️ Играть все</button>
-                </div>
-            </div>
-        `;
-        
-        artistInfo.querySelector('.artist-play-btn').addEventListener('click', () => {
-            this.tracks = data.tracks;
-            this.isRandom = true;
-            this.shuffleTracks();
-            this.playTrack(0);
-        });
-        
-        const artistTracks = document.getElementById('artist-tracks');
-        artistTracks.innerHTML = '<h2>Треки</h2>';
-        
-        data.tracks.forEach(track => {
-            const trackElement = document.createElement('div');
-            trackElement.className = 'track-item';
-            trackElement.innerHTML = `
-                <span>${track.title}</span>
-                <button class="play-button" data-track-id="${track.id}">▶</button>
-            `;
-            
-            trackElement.querySelector('.play-button').addEventListener('click', () => {
-                this.tracks = data.tracks;
-                const index = this.tracks.findIndex(t => t.id === track.id);
-                if (index !== -1) {
-                    this.playTrack(index);
-                }
-            });
-            
-            artistTracks.appendChild(trackElement);
-        });
-        
-        const artistAlbums = document.getElementById('artist-albums');
-        artistAlbums.innerHTML = '<h2>Альбомы</h2>';
-        
-        const albumsGrid = document.createElement('div');
-        albumsGrid.id = 'artist-albums-grid';
-        albumsGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px;';
-        
-        data.albums.forEach(album => {
-            const albumCard = document.createElement('div');
-            albumCard.className = 'album-card';
-            albumCard.innerHTML = `
-                <img src="${album.cover || 'https://via.placeholder.com/200x200/333/fff?text=Album'}" alt="${album.title}">
-                <div class="album-info">
-                    <div class="album-title">${album.title}</div>
-                    <div class="album-year">${album.year}</div>
-                </div>
-            `;
-            
-            albumCard.addEventListener('click', () => {
-                this.viewAlbum(album.id);
-            });
-            
-            albumsGrid.appendChild(albumCard);
-        });
-        
-        artistAlbums.appendChild(albumsGrid);
-    }
-    
-    async viewAlbum(albumId) {
-        try {
-            const response = await fetch(`/api/albums/${albumId}`);
-            const data = await response.json();
-            this.displayAlbumPage(data);
-            this.navigate('album-page');
-        } catch (error) {
-            console.error('Ошибка загрузки альбома:', error);
-        }
-    }
-    
-    displayAlbumPage(data) {
-        const albumInfo = document.getElementById('album-info');
-        albumInfo.innerHTML = `
-            <div class="artist-header">
-                <img src="${data.album.cover || 'https://via.placeholder.com/200x200/333/fff?text=Album'}" alt="${data.album.title}" style="border-radius: 10px;">
-                <div>
-                    <h1>${data.album.title}</h1>
-                    <p style="color: #b3b3b3; margin-bottom: 10px;">${data.album.artist_name} • ${data.album.year}</p>
-                    <button class="artist-play-btn">▶️ Играть альбом</button>
-                </div>
-            </div>
-        `;
-        
-        albumInfo.querySelector('.artist-play-btn').addEventListener('click', () => {
-            this.tracks = data.tracks;
-            this.isRandom = false;
-            this.playTrack(0);
-        });
-        
-        const albumTracks = document.getElementById('album-tracks');
-        albumTracks.innerHTML = '<h2>Треки</h2>';
-        
-        data.tracks.forEach(track => {
-            const trackElement = document.createElement('div');
-            trackElement.className = 'track-item';
-            trackElement.innerHTML = `
-                <div>
-                    <span>${track.title}</span>
-                    <span class="artist-link" data-artist-id="${track.artist_id}" style="margin-left: 10px; font-size: 14px;">
-                        ${track.artist_name}
-                    </span>
-                </div>
-                <button class="play-button" data-track-id="${track.id}">▶</button>
-            `;
-            
-            trackElement.querySelector('.artist-link').addEventListener('click', () => {
-                this.viewArtist(track.artist_id);
-            });
-            
-            trackElement.querySelector('.play-button').addEventListener('click', () => {
-                this.tracks = data.tracks;
-                const index = this.tracks.findIndex(t => t.id === track.id);
-                if (index !== -1) {
-                    this.playTrack(index);
-                }
-            });
-            
-            albumTracks.appendChild(trackElement);
-        });
-    }
-    
-    async playAlbum(albumId) {
-        try {
-            const response = await fetch(`/api/albums/${albumId}`);
-            const data = await response.json();
-            this.tracks = data.tracks;
-            this.isRandom = false;
-            this.playTrack(0);
-        } catch (error) {
-            console.error('Ошибка воспроизведения альбома:', error);
-        }
-    }
 }
 
-// Инициализация плеера
-const player = new MusicPlayer();
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', () => {
+    window.player = new MusicPlayer();
+});
