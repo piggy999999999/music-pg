@@ -1,0 +1,29 @@
+<div class="section active">
+    <h1>Альбомы</h1>
+    
+    <% if (albums.length === 0) { %>
+        <p>В библиотеке пока нет альбомов. <a href="/upload">Загрузите музыку</a>!</p>
+    <% } else { %>
+        <div id="albums-grid">
+            <% albums.forEach(album => { %>
+                <div class="album-card">
+                    <a href="/album/<%= album.id %>">
+                        <img src="<%= album.cover || 'https://via.placeholder.com/200x200/333/fff?text=Album' %>" alt="<%= album.title %>">
+                    </a>
+                    <div class="album-info">
+                        <div class="album-title">
+                            <a href="/album/<%= album.id %>"><%= album.title %></a>
+                        </div>
+                        <div class="album-year">
+                            <%= album.year || 'Год неизвестен' %> • <%= album.track_count %> треков
+                        </div>
+                        <div class="album-artist">
+                            <a href="/artist/<%= album.artist_id %>" class="artist-link"><%= album.artist_name %></a>
+                        </div>
+                    </div>
+                    <div class="play-overlay" data-album-id="<%= album.id %>">▶</div>
+                </div>
+            <% }) %>
+        </div>
+    <% } %>
+</div>
