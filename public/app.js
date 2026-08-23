@@ -266,6 +266,8 @@ class MusicPlayer {
             this.currentTrackIndex = index;
             const track = this.tracks[index];
             
+            console.log('Воспроизвожу трек:', track);
+            
             // Обновляем информацию о треке
             document.getElementById('track-title').textContent = track.title;
             document.getElementById('track-artist').textContent = track.artist_name;
@@ -277,14 +279,27 @@ class MusicPlayer {
             
             // Устанавливаем аудиофайл
             if (track.file_path) {
+                console.log('Путь к файлу:', track.file_path);
                 this.audio.src = track.file_path;
+                this.audio.load();
+                
+                this.audio.play()
+                    .then(() => {
+                        console.log('Воспроизведение началось');
+                        this.isPlaying = true;
+                        document.getElementById('play-btn').textContent = '⏸';
+                    })
+                    .catch(error => {
+                        console.error('Ошибка воспроизведения:', error);
+                        alert('Не удалось воспроизвести файл. Возможно, он был удален с сервера.');
+                    });
             } else {
+                console.log('Нет пути к файлу, использую заглушку');
                 this.audio.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+                this.audio.play();
+                this.isPlaying = true;
+                document.getElementById('play-btn').textContent = '⏸';
             }
-            
-            this.audio.play();
-            this.isPlaying = true;
-            document.getElementById('play-btn').textContent = '⏸';
         }
     }
     
