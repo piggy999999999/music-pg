@@ -35,11 +35,30 @@ const storage = multer.diskStorage({
 const upload = multer({ 
     storage: storage,
     fileFilter: function (req, file, cb) {
-        if (file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3') {
-            cb(null, true);
-        } else {
-            cb(new Error('Только MP3 файлы!'), false);
-        }
+      // Разрешенные аудиоформаты
+const allowedTypes = [
+    'audio/mpeg',      // MP3
+    'audio/mp3',       // MP3
+    'audio/mp4',       // M4A
+    'audio/m4a',       // M4A
+    'audio/x-m4a',     // M4A
+    'audio/aac',       // AAC
+    'audio/flac',      // FLAC
+    'audio/wav',       // WAV
+    'audio/x-wav',     // WAV
+    'audio/ogg',       // OGG
+    'audio/opus',      // Opus
+    'audio/webm'       // WebM
+];
+
+const extension = path.extname(file.originalname).toLowerCase();
+const allowedExtensions = ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus'];
+
+if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(extension)) {
+    cb(null, true);
+} else {
+    cb(new Error('Неподдерживаемый формат файла!'), false);
+}
     }
 });
 
