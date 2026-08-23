@@ -1,0 +1,38 @@
+<div class="section active">
+    <div class="artist-header">
+        <img src="<%= album.cover || 'https://via.placeholder.com/200x200/333/fff?text=Album' %>" alt="<%= album.title %>" style="border-radius: 10px;">
+        <div>
+            <h1><%= album.title %></h1>
+            <p style="color: #b3b3b3; margin-bottom: 10px;">
+                <a href="/artist/<%= album.artist_id %>" class="artist-link"><%= album.artist_name %></a> • <%= album.year || 'Год неизвестен' %>
+            </p>
+            <button class="artist-play-btn" id="play-album-btn">▶️ Играть альбом</button>
+        </div>
+    </div>
+    
+    <h2>Треки (<%= tracks.length %>)</h2>
+    
+    <% if (tracks.length === 0) { %>
+        <p>В этом альбоме пока нет треков.</p>
+    <% } else { %>
+        <div class="tracks-list">
+            <% tracks.forEach((track, index) => { %>
+                <div class="track-item" data-track-index="<%= index %>" data-track-id="<%= track.id %>">
+                    <div class="track-info">
+                        <div class="track-title"><%= track.title %></div>
+                        <div class="track-artist">
+                            <a href="/artist/<%= track.artist_id %>" class="artist-link"><%= track.artist_name %></a>
+                        </div>
+                    </div>
+                    <button class="play-button">▶</button>
+                </div>
+            <% }) %>
+        </div>
+    <% } %>
+</div>
+
+<script>
+    // Передаем треки альбома в JavaScript
+    const albumTracks = <%- JSON.stringify(tracks) %>;
+    const currentAlbum = <%- JSON.stringify(album) %>;
+</script>
