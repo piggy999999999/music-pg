@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Боковое меню -->
+        <nav class="sidebar">
+            <h2>🎵 Music App</h2>
+            <ul>
+                <li><a href="#" class="nav-link active" data-page="home">Главная</a></li>
+                <li><a href="#" class="nav-link" data-page="search">Поиск</a></li>
+                <li><a href="#" class="nav-link" data-page="albums">Альбомы</a></li>
+            </ul>
+        </nav>
+        
+        <!-- Основной контент -->
+        <main class="main-content">
+            <!-- Главная страница -->
+            <div id="home" class="section active">
+                <h1>Главная</h1>
+                <div id="now-playing">
+                    <img id="track-image" src="https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36" alt="Album Cover">
+                    <div class="track-info">
+                        <h2 id="track-title">Выберите трек</h2>
+                        <p id="track-artist">Исполнитель</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Страница поиска -->
+            <div id="search" class="section">
+                <h1>Поиск</h1>
+                <input type="text" id="search-input" placeholder="Введите название трека...">
+                <div id="search-results"></div>
+            </div>
+            
+            <!-- Страница альбомов -->
+            <div id="albums" class="section">
+                <h1>Альбомы</h1>
+                <div id="albums-grid"></div>
+            </div>
+            
+            <!-- Страница исполнителя -->
+            <div id="artist-page" class="section">
+                <div id="artist-info"></div>
+                <div id="artist-tracks"></div>
+                <div id="artist-albums"></div>
+            </div>
+            
+            <!-- Страница альбома -->
+            <div id="album-page" class="section">
+                <div id="album-info"></div>
+                <div id="album-tracks"></div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Плеер -->
+    <div class="player-bar">
+        <div class="player-controls">
+            <button id="prev-btn">⏮</button>
+            <button id="play-btn">▶️</button>
+            <button id="next-btn">⏭</button>
+        </div>
+        <div class="player-progress">
+            <span id="current-time">0:00</span>
+            <input type="range" id="progress-bar" min="0" max="100" value="0">
+            <span id="total-time">0:00</span>
+        </div>
+        <div class="volume-control">
+            <span>🔊</span>
+            <input type="range" id="volume-bar" min="0" max="100" value="70">
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
