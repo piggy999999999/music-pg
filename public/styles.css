@@ -517,3 +517,113 @@ h2 {
         font-size: 14px;
     }
 }
+/* Стили для ссылок в треках */
+.track-title {
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 5px;
+}
+
+.track-artist {
+    color: #b3b3b3;
+    font-size: 14px;
+}
+
+.artist-link,
+.album-link {
+    color: #1db954;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.artist-link:hover,
+.album-link:hover {
+    color: #1ed760;
+    text-decoration: underline;
+}
+
+/* Стили для списка треков */
+.tracks-list {
+    margin-top: 20px;
+}
+
+.track-item {
+    padding: 15px;
+    background: #2a2a2a;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.track-item:hover {
+    background: #333;
+}
+
+.track-item .play-button {
+    background: #1db954;
+    border: none;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s;
+}
+
+.track-item .play-button:hover {
+    background: #1ed760;
+}
+
+/* Обновляем стили для альбомов */
+.album-card a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.album-title a {
+    color: #fff;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.album-title a:hover {
+    color: #1db954;
+}
+
+.album-artist {
+    margin-top: 5px;
+}
+
+.album-artist a {
+    color: #1db954;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.album-artist a:hover {
+    text-decoration: underline;
+}
+
+/* Стили для результатов загрузки */
+.upload-result-item {
+    padding: 15px;
+    background: #2a2a2a;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.upload-result-item .success-icon {
+    color: #1db954;
+    font-size: 24px;
+}
