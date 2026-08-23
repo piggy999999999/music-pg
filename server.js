@@ -1,11 +1,47 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const multer = require('multer');
+const mm = require('music-metadata');
+const fs = require('fs');
 const app = express();
 const port = 3000;
 
 app.use(express.json());
 app.use(express.static('public'));
+app.use('/uploads', express.static('uploads'));
+
+// Создаем папку для загрузок, если её нет
+if (!fs.existsSync('uploads')) {
+    fs.mkdirSync('uploads');
+}
+
+// Создаем папку для обложек, если её нет
+if (!fs.existsSync('covers')) {
+    fs.mkdirSync('covers');
+}
+
+// Настройка загрузки файлов
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ 
+    storage: storage,
+    fileFilter: function (req, file, cb) {
+        if (file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3') {
+            cb(null, true);
+        } else {
+            cb(new Error('Только MP3 файлы!'), false);
+        }
+    }
+});
 
 // Создаем базу данных
 const db = new sqlite3.Database('./music.db');
@@ -15,7 +51,7 @@ db.serialize(() => {
     db.run(`
         CREATE TABLE IF NOT EXISTS artists (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
+            name TEXT NOT NULL UNIQUE,
             photo TEXT
         )
     `);
@@ -45,24 +81,146 @@ db.serialize(() => {
     `);
 });
 
-// Тестовые данные (потом удалим)
-db.serialize(() => {
-    // Добавляем тестового исполнителя
-    db.run(`INSERT OR IGNORE INTO artists (id, name, photo) VALUES (1, 'The Weeknd', 'https://i.scdn.co/image/ab6761610000e5eb214f3cf1cbe7139c1e26ffbb')`);
-    
-    // Добавляем тестовый альбом
-    db.run(`INSERT OR IGNORE INTO albums (id, title, year, cover, artist_id) VALUES (1, 'After Hours', 2020, 'https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36', 1)`);
-    
-    // Добавляем тестовые треки
-    db.run(`INSERT OR IGNORE INTO tracks (id, title, duration, artist_id, album_id) VALUES (1, 'Blinding Lights', 200, 1, 1)`);
-    db.run(`INSERT OR IGNORE INTO tracks (id, title, duration, artist_id, album_id) VALUES (2, 'Save Your Tears', 215, 1, 1)`);
-    db.run(`INSERT OR IGNORE INTO tracks (id, title, duration, artist_id, album_id) VALUES (3, 'In Your Eyes', 210, 1, 1)`);
+// Функция для получения или создания исполнителя
+function getOrCreateArtist(name, photo = null) {
+    return new Promise((resolve, reject) => {
+        db.get('SELECT * FROM artists WHERE name = ?', [name], (err, artist) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            
+            if (artist) {
+                // Обновляем фото, если его не было
+                if (photo && !artist.photo) {
+                    db.run('UPDATE artists SET photo = ? WHERE id = ?', [photo, artist.id]);
+                    artist.photo = photo;
+                }
+                resolve(artist);
+            } else {
+                db.run('INSERT INTO artists (name, photo) VALUES (?, ?)', [name, photo], function(err) {
+                    if (err) {
+                        reject(err);
+                        return;
+                    }
+                    resolve({ id: this.lastID, name, photo });
+                });
+            }
+        });
+    });
+}
+
+// Функция для получения или создания альбома
+function getOrCreateAlbum(title, artistId, year = null, cover = null) {
+    return new Promise((resolve, reject) => {
+        db.get('SELECT * FROM albums WHERE title = ? AND artist_id = ?', [title, artistId], (err, album) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            
+            if (album) {
+                // Обновляем обложку и год, если их не было
+                if (cover && !album.cover) {
+                    db.run('UPDATE albums SET cover = ? WHERE id = ?', [cover, album.id]);
+                    album.cover = cover;
+                }
+                if (year && !album.year) {
+                    db.run('UPDATE albums SET year = ? WHERE id = ?', [year, album.id]);
+                    album.year = year;
+                }
+                resolve(album);
+            } else {
+                db.run('INSERT INTO albums (title, year, cover, artist_id) VALUES (?, ?, ?, ?)', 
+                    [title, year, cover, artistId], function(err) {
+                    if (err) {
+                        reject(err);
+                        return;
+                    }
+                    resolve({ id: this.lastID, title, year, cover, artist_id: artistId });
+                });
+            }
+        });
+    });
+}
+
+// API для загрузки MP3 файлов
+app.post('/api/upload', upload.array('files', 20), async (req, res) => {
+    try {
+        const uploadedTracks = [];
+        
+        for (const file of req.files) {
+            try {
+                // Читаем метаданные из файла
+                const metadata = await mm.parseFile(file.path);
+                
+                const title = metadata.common.title || path.basename(file.originalname, '.mp3');
+                const artistName = metadata.common.artist || 'Unknown Artist';
+                const albumTitle = metadata.common.album || 'Unknown Album';
+                const year = metadata.common.year || null;
+                const duration = Math.round(metadata.format.duration || 180);
+                
+                // Извлекаем обложку альбома
+                let coverPath = null;
+                if (metadata.common.picture && metadata.common.picture.length > 0) {
+                    const picture = metadata.common.picture[0];
+                    const coverName = Date.now() + '-' + Math.round(Math.random() * 1E9) + '.jpg';
+                    fs.writeFileSync(path.join('covers', coverName), picture.data);
+                    coverPath = '/covers/' + coverName;
+                }
+                
+                // Получаем или создаем исполнителя
+                const artist = await getOrCreateArtist(artistName, coverPath);
+                
+                // Получаем или создаем альбом
+                const album = await getOrCreateAlbum(albumTitle, artist.id, year, coverPath);
+                
+                // Добавляем трек в базу
+                const trackResult = await new Promise((resolve, reject) => {
+                    db.run('INSERT INTO tracks (title, duration, file_path, album_id, artist_id) VALUES (?, ?, ?, ?, ?)',
+                        [title, duration, '/uploads/' + file.filename, album.id, artist.id],
+                        function(err) {
+                            if (err) {
+                                reject(err);
+                                return;
+                            }
+                            resolve(this.lastID);
+                        });
+                });
+                
+                uploadedTracks.push({
+                    id: trackResult,
+                    title,
+                    artist_name: artistName,
+                    album_title: albumTitle,
+                    duration
+                });
+                
+            } catch (error) {
+                console.error('Ошибка обработки файла:', file.originalname, error);
+            }
+        }
+        
+        res.json({
+            success: true,
+            message: `Загружено треков: ${uploadedTracks.length}`,
+            tracks: uploadedTracks
+        });
+        
+    } catch (error) {
+        console.error('Ошибка загрузки:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Ошибка при загрузке файлов' 
+        });
+    }
 });
 
 // API для получения всех треков
 app.get('/api/tracks', (req, res) => {
     db.all(`
-        SELECT tracks.*, artists.name as artist_name, albums.title as album_title
+        SELECT tracks.*, artists.name as artist_name, albums.title as album_title,
+               albums.cover as album_cover
         FROM tracks
         LEFT JOIN artists ON tracks.artist_id = artists.id
         LEFT JOIN albums ON tracks.album_id = albums.id
@@ -79,7 +237,8 @@ app.get('/api/tracks', (req, res) => {
 app.get('/api/tracks/search', (req, res) => {
     const query = req.query.q || '';
     db.all(`
-        SELECT tracks.*, artists.name as artist_name, albums.title as album_title
+        SELECT tracks.*, artists.name as artist_name, albums.title as album_title,
+               albums.cover as album_cover
         FROM tracks
         LEFT JOIN artists ON tracks.artist_id = artists.id
         LEFT JOIN albums ON tracks.album_id = albums.id
