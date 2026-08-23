@@ -180,13 +180,24 @@ app.post('/api/upload', upload.array('files', 20), async (req, res) => {
                 const year = metadata.common.year || null;
                 const duration = Math.round(metadata.format.duration || 180);
                 
-                // Извлекаем обложку альбома
+                 // Извлекаем обложку альбома
                 let coverPath = null;
                 if (metadata.common.picture && metadata.common.picture.length > 0) {
                     const picture = metadata.common.picture[0];
                     const coverName = Date.now() + '-' + Math.round(Math.random() * 1E9) + '.jpg';
-                    fs.writeFileSync(path.join('covers', coverName), picture.data);
-                    coverPath = '/covers/' + coverName;
+                    const coverFullPath = path.join(__dirname, 'covers', coverName);
+                    
+                    console.log('Сохраняю обложку в:', coverFullPath);
+                    
+                    try {
+                        fs.writeFileSync(coverFullPath, picture.data);
+                        coverPath = '/covers/' + coverName;
+                        console.log('Обложка сохранена:', coverPath);
+                    } catch (error) {
+                        console.error('Ошибка сохранения обложки:', error);
+                    }
+                } else {
+                    console.log('Обложка не найдена в метаданных');
                 }
                 
                 // Получаем или создаем исполнителя
