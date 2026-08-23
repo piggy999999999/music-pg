@@ -40,8 +40,167 @@ class MusicPlayer {
         // Поиск
         document.getElementById('search-input').addEventListener('input', (e) => this.searchTracks(e.target.value));
         
+        // Загрузка файлов
+        this.initUploadListeners();
+        
         // Установка начальной громкости
         this.setVolume(70);
+    }
+    
+    // Инициализация загрузки файлов
+    initUploadListeners() {
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const selectFilesBtn = document.getElementById('select-files-btn');
+        
+        // Открытие диалога выбора файлов
+        selectFilesBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput.click();
+        });
+        
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        // Выбор файлов через диалог
+        fileInput.addEventListener('change', (e) => {
+            this.handleFiles(e.target.files);
+        });
+        
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            this.handleFiles(files);
+        });
+    }
+    
+    // Обработка выбранных файлов
+    handleFiles(files) {
+        const mp3Files = Array.from(files).filter(file => 
+            file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3')
+        );
+        
+        if (mp3Files.length === 0) {
+            alert('Пожалуйста, выберите MP3 файлы!');
+            return;
+        }
+        
+        this.uploadFiles(mp3Files);
+    }
+    
+    // Загрузка файлов на сервер
+    async uploadFiles(files) {
+        const formData = new FormData();
+        
+        files.forEach(file => {
+            formData.append('files', file);
+        });
+        
+        // Показываем прогресс
+        const progressContainer = document.getElementById('upload-progress');
+        const progressFill = document.getElementById('progress-fill');
+        const uploadStatus = document.getElementById('upload-status');
+        const resultsContainer = document.getElementById('upload-results');
+        
+        progressContainer.style.display = 'block';
+        progressFill.style.width = '0%';
+        uploadStatus.textContent = `Подготовка к загрузке ${files.length} файлов...`;
+        resultsContainer.innerHTML = '';
+        
+        try {
+            const xhr = new XMLHttpRequest();
+            
+            // Отслеживаем прогресс загрузки
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    progressFill.style.width = percentComplete + '%';
+                    uploadStatus.textContent = `Загрузка: ${Math.round(percentComplete)}%`;
+                }
+            });
+            
+            // Обработка ответа
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    
+                    progressFill.style.width = '100%';
+                    uploadStatus.textContent = response.message;
+                    
+                    // Показываем результаты
+                    this.displayUploadResults(response.tracks);
+                    
+                    // Обновляем список треков
+                    this.loadAllTracks();
+                    this.loadAlbums();
+                    
+                    // Очищаем input
+                    document.getElementById('file-input').value = '';
+                    
+                    // Скрываем прогресс через 3 секунды
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                    }, 3000);
+                    
+                } else {
+                    uploadStatus.textContent = 'Ошибка при загрузке файлов';
+                    progressFill.style.width = '0%';
+                }
+            });
+            
+            // Обработка ошибок
+            xhr.addEventListener('error', () => {
+                uploadStatus.textContent = 'Ошибка сети при загрузке';
+                progressFill.style.width = '0%';
+            });
+            
+            // Отправляем файлы
+            xhr.open('POST', '/api/upload', true);
+            xhr.send(formData);
+            
+        } catch (error) {
+            console.error('Ошибка загрузки:', error);
+            uploadStatus.textContent = 'Ошибка при загрузке файлов';
+            progressFill.style.width = '0%';
+        }
+    }
+    
+    // Отображение результатов загрузки
+    displayUploadResults(tracks) {
+        const resultsContainer = document.getElementById('upload-results');
+        resultsContainer.innerHTML = '<h3>Загруженные треки:</h3>';
+        
+        if (!tracks || tracks.length === 0) {
+            resultsContainer.innerHTML += '<p>Нет загруженных треков</p>';
+            return;
+        }
+        
+        tracks.forEach(track => {
+            const trackElement = document.createElement('div');
+            trackElement.className = 'upload-result-item';
+            trackElement.innerHTML = `
+                <div class="track-info">
+                    <div class="track-title">${track.title}</div>
+                    <div class="track-artist">${track.artist_name} • ${track.album_title}</div>
+                </div>
+                <span class="success-icon">✓</span>
+            `;
+            resultsContainer.appendChild(trackElement);
+        });
     }
     
     // Навигация по страницам
@@ -101,9 +260,12 @@ class MusicPlayer {
                 document.getElementById('track-image').src = track.album_cover;
             }
             
-            // Здесь должен быть реальный аудиофайл
-            // Пока используем заглушку
-            this.audio.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+            // Устанавливаем аудиофайл
+            if (track.file_path) {
+                this.audio.src = track.file_path;
+            } else {
+                this.audio.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+            }
             
             this.audio.play();
             this.isPlaying = true;
