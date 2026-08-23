@@ -10,6 +10,7 @@ const port = 3000;
 app.use(express.json());
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
+app.use('/covers', express.static('covers'));
 
 // Создаем папку для загрузок, если её нет
 if (!fs.existsSync('uploads')) {
