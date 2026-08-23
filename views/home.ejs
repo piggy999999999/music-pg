@@ -1,0 +1,39 @@
+<div class="section active">
+    <h1>Главная</h1>
+    
+    <div id="now-playing">
+        <img id="track-image" src="https://via.placeholder.com/150x150/333/fff?text=Album" alt="Album Cover">
+        <div class="track-info">
+            <h2 id="track-title">Выберите трек</h2>
+            <p id="track-artist">Исполнитель</p>
+        </div>
+    </div>
+    
+    <h2>Все треки (<%= tracks.length %>)</h2>
+    
+    <% if (tracks.length === 0) { %>
+        <p>В библиотеке пока нет треков. <a href="/upload">Загрузите музыку</a>!</p>
+    <% } else { %>
+        <div class="tracks-list">
+            <% tracks.forEach((track, index) => { %>
+                <div class="track-item" data-track-index="<%= index %>" data-track-id="<%= track.id %>">
+                    <div class="track-info">
+                        <div class="track-title"><%= track.title %></div>
+                        <div class="track-artist">
+                            <a href="/artist/<%= track.artist_id %>" class="artist-link"><%= track.artist_name %></a>
+                            <% if (track.album_title) { %>
+                                • <a href="/album/<%= track.album_id %>" class="album-link"><%= track.album_title %></a>
+                            <% } %>
+                        </div>
+                    </div>
+                    <button class="play-button">▶</button>
+                </div>
+            <% }) %>
+        </div>
+    <% } %>
+</div>
+
+<script>
+    // Передаем треки в JavaScript
+    const allTracks = <%- JSON.stringify(tracks) %>;
+</script>
