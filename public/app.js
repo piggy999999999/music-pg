@@ -89,16 +89,20 @@ class MusicPlayer {
     }
     
     // Обработка выбранных файлов
-    handleFiles(files) {
-        const allowedExtensions = ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus'];
-const audioFiles = Array.from(files).filter(file => {
-    const extension = '.' + file.name.split('.').pop().toLowerCase();
-    return file.type.startsWith('audio/') || allowedExtensions.includes(extension);
-});
-        
-        if (audioFiles.length === 0) {
-    alert('Пожалуйста, выберите аудиофайлы (MP3, M4A, FLAC, WAV, OGG)!');
-    return;
+handleFiles(files) {
+    const allowedExtensions = ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus'];
+    const audioFiles = Array.from(files).filter(file => {
+        const extension = '.' + file.name.split('.').pop().toLowerCase();
+        return file.type.startsWith('audio/') || allowedExtensions.includes(extension);
+    });
+    
+    if (audioFiles.length === 0) {
+        alert('Пожалуйста, выберите аудиофайлы (MP3, M4A, FLAC, WAV, OGG)!');
+        return;
+    }
+    
+    console.log('Найдено аудиофайлов:', audioFiles.length);
+    this.uploadFiles(audioFiles);
 }
         
         this.uploadFiles(mp3Files);
