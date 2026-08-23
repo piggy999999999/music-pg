@@ -10,28 +10,46 @@ class MusicPlayer {
         this.init();
     }
     
-    init() {
-        // Получаем треки из глобальных переменных (если они есть)
-        if (typeof allTracks !== 'undefined') {
-            this.tracks = allTracks;
-        } else if (typeof albumTracks !== 'undefined') {
-            this.tracks = albumTracks;
-        } else if (typeof artistTracks !== 'undefined') {
-            this.tracks = artistTracks;
-        }
-        
-        this.initPlayerControls();
-        this.initTrackClicks();
-        this.initAlbumPlayButtons();
-        this.initArtistPlayButton();
-        this.initSearch();
-        this.initUpload();
-        
-        // Установка громкости
-        this.setVolume(70);
-        
-        console.log('Плеер инициализирован. Треков:', this.tracks.length);
+init() {
+    // Загружаем треки с сервера
+    this.loadTracksFromServer();
+    
+    this.initPlayerControls();
+    this.initTrackClicks();
+    this.initAlbumPlayButtons();
+    this.initArtistPlayButton();
+    this.initSearch();
+    this.initUpload();
+    
+    // Установка громкости
+    this.setVolume(70);
+    
+    console.log('Плеер инициализирован');
+}
+
+async loadTracksFromServer() {
+    try {
+        const response = await fetch('/api/tracks');
+        const data = await response.json();
+        this.tracks = data;
+        console.log('Загружено треков с сервера:', this.tracks.length);
+        this.shuffleTracks();
+        this.updateTracksList();
+    } catch (error) {
+        console.error('Ошибка загрузки треков:', error);
     }
+}
+
+updateTracksList() {
+    // Обновляем data-track-index для всех треков на странице
+    document.querySelectorAll('.track-item').forEach(item => {
+        const trackId = parseInt(item.getAttribute('data-track-id'));
+        const index = this.tracks.findIndex(t => t.id === trackId);
+        if (index !== -1) {
+            item.setAttribute('data-track-index', index);
+        }
+    });
+}
     
     initPlayerControls() {
         const playBtn = document.getElementById('play-btn');
