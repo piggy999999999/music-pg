@@ -53,6 +53,11 @@ class MusicPlayer {
         const fileInput = document.getElementById('file-input');
         const selectFilesBtn = document.getElementById('select-files-btn');
         
+        if (!uploadArea || !fileInput || !selectFilesBtn) {
+            console.error('Элементы загрузки не найдены');
+            return;
+        }
+        
         // Открытие диалога выбора файлов
         selectFilesBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -88,7 +93,7 @@ class MusicPlayer {
         });
     }
     
-            // Обработка выбранных файлов
+    // Обработка выбранных файлов
     handleFiles(files) {
         const allowedExtensions = ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus'];
         
@@ -105,11 +110,15 @@ class MusicPlayer {
         console.log('Найдено аудиофайлов:', audioFiles.length);
         this.uploadFiles(audioFiles);
     }
+    
     // Загрузка файлов на сервер
     async uploadFiles(files) {
+        console.log('Начинаю загрузку файлов:', files.length);
+        
         const formData = new FormData();
         
         files.forEach(file => {
+            console.log('Добавляю файл:', file.name, file.type, file.size);
             formData.append('files', file);
         });
         
@@ -208,6 +217,8 @@ class MusicPlayer {
     
     // Навигация по страницам
     navigate(page) {
+        console.log('Навигация на страницу:', page);
+        
         // Скрываем все секции
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         
@@ -232,6 +243,7 @@ class MusicPlayer {
         try {
             const response = await fetch('/api/tracks');
             this.tracks = await response.json();
+            console.log('Загружено треков:', this.tracks.length);
             this.shuffleTracks();
         } catch (error) {
             console.error('Ошибка загрузки треков:', error);
@@ -380,12 +392,10 @@ class MusicPlayer {
                 <button class="play-button" data-track-id="${track.id}">▶</button>
             `;
             
-            // Обработчик клика по имени исполнителя
             trackElement.querySelector('.artist-link').addEventListener('click', () => {
                 this.viewArtist(track.artist_id);
             });
             
-            // Обработчик клика по кнопке play
             trackElement.querySelector('.play-button').addEventListener('click', () => {
                 const index = this.tracks.findIndex(t => t.id === track.id);
                 if (index !== -1) {
@@ -426,14 +436,12 @@ class MusicPlayer {
                 <div class="play-overlay">▶</div>
             `;
             
-            // Клик по карточке альбома
             albumCard.addEventListener('click', (e) => {
                 if (!e.target.classList.contains('play-overlay')) {
                     this.viewAlbum(album.id);
                 }
             });
             
-            // Клик по кнопке play
             albumCard.querySelector('.play-overlay').addEventListener('click', () => {
                 this.playAlbum(album.id);
             });
@@ -456,7 +464,6 @@ class MusicPlayer {
     
     // Отображение страницы исполнителя
     displayArtistPage(data) {
-        // Информация об исполнителе
         const artistInfo = document.getElementById('artist-info');
         artistInfo.innerHTML = `
             <div class="artist-header">
@@ -468,7 +475,6 @@ class MusicPlayer {
             </div>
         `;
         
-        // Обработчик кнопки "Играть все"
         artistInfo.querySelector('.artist-play-btn').addEventListener('click', () => {
             this.tracks = data.tracks;
             this.isRandom = true;
@@ -476,7 +482,6 @@ class MusicPlayer {
             this.playTrack(0);
         });
         
-        // Треки исполнителя
         const artistTracks = document.getElementById('artist-tracks');
         artistTracks.innerHTML = '<h2>Треки</h2>';
         
@@ -499,7 +504,6 @@ class MusicPlayer {
             artistTracks.appendChild(trackElement);
         });
         
-        // Альбомы исполнителя
         const artistAlbums = document.getElementById('artist-albums');
         artistAlbums.innerHTML = '<h2>Альбомы</h2>';
         
@@ -528,20 +532,6 @@ class MusicPlayer {
         artistAlbums.appendChild(albumsGrid);
     }
     
-    // Воспроизведение всех треков исполнителя
-    async playArtistTracks(artistId) {
-        try {
-            const response = await fetch(`/api/artists/${artistId}`);
-            const data = await response.json();
-            this.tracks = data.tracks;
-            this.isRandom = true;
-            this.shuffleTracks();
-            this.playTrack(0);
-        } catch (error) {
-            console.error('Ошибка воспроизведения:', error);
-        }
-    }
-    
     // Просмотр страницы альбома
     async viewAlbum(albumId) {
         try {
@@ -556,7 +546,6 @@ class MusicPlayer {
     
     // Отображение страницы альбома
     displayAlbumPage(data) {
-        // Информация об альбоме
         const albumInfo = document.getElementById('album-info');
         albumInfo.innerHTML = `
             <div class="artist-header">
@@ -569,14 +558,12 @@ class MusicPlayer {
             </div>
         `;
         
-        // Обработчик кнопки "Играть альбом"
         albumInfo.querySelector('.artist-play-btn').addEventListener('click', () => {
             this.tracks = data.tracks;
             this.isRandom = false;
             this.playTrack(0);
         });
         
-        // Треки альбома
         const albumTracks = document.getElementById('album-tracks');
         albumTracks.innerHTML = '<h2>Треки</h2>';
         
@@ -593,12 +580,10 @@ class MusicPlayer {
                 <button class="play-button" data-track-id="${track.id}">▶</button>
             `;
             
-            // Обработчик клика по имени исполнителя
             trackElement.querySelector('.artist-link').addEventListener('click', () => {
                 this.viewArtist(track.artist_id);
             });
             
-            // Обработчик клика по кнопке play
             trackElement.querySelector('.play-button').addEventListener('click', () => {
                 this.tracks = data.tracks;
                 const index = this.tracks.findIndex(t => t.id === track.id);
