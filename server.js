@@ -7,17 +7,20 @@ const fs = require('fs');
 const app = express();
 const port = 3000;
 
-app.use(express.json());
+// Настройка EJS
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// Статические файлы
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 app.use('/covers', express.static('covers'));
+app.use(express.json());
 
-// Создаем папку для загрузок, если её нет
+// Создаем папки, если их нет
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
-
-// Создаем папку для обложек, если её нет
 if (!fs.existsSync('covers')) {
     fs.mkdirSync('covers');
 }
@@ -36,30 +39,14 @@ const storage = multer.diskStorage({
 const upload = multer({ 
     storage: storage,
     fileFilter: function (req, file, cb) {
-      // Разрешенные аудиоформаты
-const allowedTypes = [
-    'audio/mpeg',      // MP3
-    'audio/mp3',       // MP3
-    'audio/mp4',       // M4A
-    'audio/m4a',       // M4A
-    'audio/x-m4a',     // M4A
-    'audio/aac',       // AAC
-    'audio/flac',      // FLAC
-    'audio/wav',       // WAV
-    'audio/x-wav',     // WAV
-    'audio/ogg',       // OGG
-    'audio/opus',      // Opus
-    'audio/webm'       // WebM
-];
-
-const extension = path.extname(file.originalname).toLowerCase();
-const allowedExtensions = ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus'];
-
-if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(extension)) {
-    cb(null, true);
-} else {
-    cb(new Error('Неподдерживаемый формат файла!'), false);
-}
+        const allowedExtensions = ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus'];
+        const extension = path.extname(file.originalname).toLowerCase();
+        
+        if (file.mimetype.startsWith('audio/') || allowedExtensions.includes(extension)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Неподдерживаемый формат файла!'), false);
+        }
     }
 });
 
@@ -111,7 +98,6 @@ function getOrCreateArtist(name, photo = null) {
             }
             
             if (artist) {
-                // Обновляем фото, если его не было
                 if (photo && !artist.photo) {
                     db.run('UPDATE artists SET photo = ? WHERE id = ?', [photo, artist.id]);
                     artist.photo = photo;
@@ -140,7 +126,6 @@ function getOrCreateAlbum(title, artistId, year = null, cover = null) {
             }
             
             if (album) {
-                // Обновляем обложку и год, если их не было
                 if (cover && !album.cover) {
                     db.run('UPDATE albums SET cover = ? WHERE id = ?', [cover, album.id]);
                     album.cover = cover;
@@ -164,23 +149,157 @@ function getOrCreateAlbum(title, artistId, year = null, cover = null) {
     });
 }
 
+// ============ МАРШРУТЫ СТРАНИЦ ============
+
+// Главная страница
+app.get('/', (req, res) => {
+    db.all(`
+        SELECT tracks.*, artists.name as artist_name, albums.title as album_title,
+               albums.cover as album_cover
+        FROM tracks
+        LEFT JOIN artists ON tracks.artist_id = artists.id
+        LEFT JOIN albums ON tracks.album_id = albums.id
+    `, (err, tracks) => {
+        if (err) {
+            console.error('Ошибка загрузки треков:', err);
+            tracks = [];
+        }
+        res.render('home', { 
+            title: 'Главная',
+            tracks: tracks,
+            activePage: 'home'
+        });
+    });
+});
+
+// Страница поиска
+app.get('/search', (req, res) => {
+    res.render('search', { 
+        title: 'Поиск',
+        activePage: 'search'
+    });
+});
+
+// Страница альбомов
+app.get('/albums', (req, res) => {
+    db.all(`
+        SELECT albums.*, artists.name as artist_name,
+        (SELECT COUNT(*) FROM tracks WHERE tracks.album_id = albums.id) as track_count
+        FROM albums
+        LEFT JOIN artists ON albums.artist_id = artists.id
+    `, (err, albums) => {
+        if (err) {
+            console.error('Ошибка загрузки альбомов:', err);
+            albums = [];
+        }
+        res.render('albums', { 
+            title: 'Альбомы',
+            albums: albums,
+            activePage: 'albums'
+        });
+    });
+});
+
+// Страница альбома
+app.get('/album/:id', (req, res) => {
+    const albumId = req.params.id;
+    
+    db.get(`
+        SELECT albums.*, artists.name as artist_name
+        FROM albums
+        LEFT JOIN artists ON albums.artist_id = artists.id
+        WHERE albums.id = ?
+    `, [albumId], (err, album) => {
+        if (err || !album) {
+            console.error('Альбом не найден:', err);
+            res.redirect('/albums');
+            return;
+        }
+        
+        db.all(`
+            SELECT tracks.*, artists.name as artist_name
+            FROM tracks
+            LEFT JOIN artists ON tracks.artist_id = artists.id
+            WHERE tracks.album_id = ?
+        `, [albumId], (err, tracks) => {
+            if (err) {
+                tracks = [];
+            }
+            res.render('album', { 
+                title: album.title,
+                album: album,
+                tracks: tracks,
+                activePage: 'albums'
+            });
+        });
+    });
+});
+
+// Страница исполнителя
+app.get('/artist/:id', (req, res) => {
+    const artistId = req.params.id;
+    
+    db.get('SELECT * FROM artists WHERE id = ?', [artistId], (err, artist) => {
+        if (err || !artist) {
+            console.error('Исполнитель не найден:', err);
+            res.redirect('/');
+            return;
+        }
+        
+        db.all('SELECT * FROM tracks WHERE artist_id = ?', [artistId], (err, tracks) => {
+            if (err) {
+                tracks = [];
+            }
+            
+            db.all(`
+                SELECT DISTINCT albums.* FROM albums
+                JOIN tracks ON tracks.album_id = albums.id
+                WHERE tracks.artist_id = ?
+            `, [artistId], (err, albums) => {
+                if (err) {
+                    albums = [];
+                }
+                
+                res.render('artist', { 
+                    title: artist.name,
+                    artist: artist,
+                    tracks: tracks,
+                    albums: albums,
+                    activePage: null
+                });
+            });
+        });
+    });
+});
+
+// Страница загрузки
+app.get('/upload', (req, res) => {
+    res.render('upload', { 
+        title: 'Загрузка',
+        activePage: 'upload'
+    });
+});
+
+// ============ API ============
+
 // API для загрузки MP3 файлов
 app.post('/api/upload', upload.array('files', 20), async (req, res) => {
     try {
+        console.log('Получены файлы:', req.files?.length);
         const uploadedTracks = [];
         
         for (const file of req.files) {
             try {
-                // Читаем метаданные из файла
+                console.log('Обрабатываю файл:', file.originalname, file.mimetype, file.size);
+                
                 const metadata = await mm.parseFile(file.path);
                 
-                const title = metadata.common.title || path.basename(file.originalname, '.mp3');
+                const title = metadata.common.title || path.basename(file.originalname, path.extname(file.originalname));
                 const artistName = metadata.common.artist || 'Unknown Artist';
                 const albumTitle = metadata.common.album || 'Unknown Album';
                 const year = metadata.common.year || null;
                 const duration = Math.round(metadata.format.duration || 180);
                 
-                 // Извлекаем обложку альбома
                 let coverPath = null;
                 if (metadata.common.picture && metadata.common.picture.length > 0) {
                     const picture = metadata.common.picture[0];
@@ -200,13 +319,9 @@ app.post('/api/upload', upload.array('files', 20), async (req, res) => {
                     console.log('Обложка не найдена в метаданных');
                 }
                 
-                // Получаем или создаем исполнителя
                 const artist = await getOrCreateArtist(artistName, coverPath);
-                
-                // Получаем или создаем альбом
                 const album = await getOrCreateAlbum(albumTitle, artist.id, year, coverPath);
                 
-                // Добавляем трек в базу
                 const trackResult = await new Promise((resolve, reject) => {
                     db.run('INSERT INTO tracks (title, duration, file_path, album_id, artist_id) VALUES (?, ?, ?, ?, ?)',
                         [title, duration, '/uploads/' + file.filename, album.id, artist.id],
@@ -283,93 +398,7 @@ app.get('/api/tracks/search', (req, res) => {
     });
 });
 
-// API для получения информации об исполнителе
-app.get('/api/artists/:id', (req, res) => {
-    const artistId = req.params.id;
-    
-    db.get('SELECT * FROM artists WHERE id = ?', [artistId], (err, artist) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        if (!artist) {
-            res.status(404).json({ error: 'Artist not found' });
-            return;
-        }
-        
-        db.all('SELECT * FROM tracks WHERE artist_id = ?', [artistId], (err, tracks) => {
-            if (err) {
-                res.status(500).json({ error: err.message });
-                return;
-            }
-            
-            db.all(`
-                SELECT DISTINCT albums.* FROM albums
-                JOIN tracks ON tracks.album_id = albums.id
-                WHERE tracks.artist_id = ?
-            `, [artistId], (err, albums) => {
-                if (err) {
-                    res.status(500).json({ error: err.message });
-                    return;
-                }
-                
-                res.json({ artist, tracks, albums });
-            });
-        });
-    });
-});
-
-// API для получения списка альбомов
-app.get('/api/albums', (req, res) => {
-    db.all(`
-        SELECT albums.*, artists.name as artist_name,
-        (SELECT COUNT(*) FROM tracks WHERE tracks.album_id = albums.id) as track_count
-        FROM albums
-        LEFT JOIN artists ON albums.artist_id = artists.id
-    `, (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        res.json(rows);
-    });
-});
-
-// API для получения информации об альбоме
-app.get('/api/albums/:id', (req, res) => {
-    const albumId = req.params.id;
-    
-    db.get(`
-        SELECT albums.*, artists.name as artist_name
-        FROM albums
-        LEFT JOIN artists ON albums.artist_id = artists.id
-        WHERE albums.id = ?
-    `, [albumId], (err, album) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        if (!album) {
-            res.status(404).json({ error: 'Album not found' });
-            return;
-        }
-        
-        db.all(`
-            SELECT tracks.*, artists.name as artist_name
-            FROM tracks
-            LEFT JOIN artists ON tracks.artist_id = artists.id
-            WHERE tracks.album_id = ?
-        `, [albumId], (err, tracks) => {
-            if (err) {
-                res.status(500).json({ error: err.message });
-                return;
-            }
-            
-            res.json({ album, tracks });
-        });
-    });
-});
-
+// Запуск сервера
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 });
